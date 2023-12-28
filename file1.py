@@ -2,15 +2,17 @@ import requests
 import datetime
 import logging
 
+with open('credentials.txt', 'r') as file:
+    lines = file.readlines()
+    API_URL = lines[0].strip()
+    Username = lines[1].strip()
+    Password = lines[2].strip()
 
-API_URL = 'https://Domain.com:port/api'  # Replace with the actual API URL
-BASE_NAME = 'user'  # Base name for the new users
-START_NUMBER = 1  # Start number for the new users
-NUM_USERS = 5  # Number of new users to create
-DATA_LIMIT_GB = 15  # Data limit per GB
-Days = 12 # Expire Date per Day
-Username = "user"
-Password = "pass"
+BASE_NAME = input("Enter username: ")
+START_NUMBER = int(input("Enter start number: "))
+NUM_USERS = int(input("Enter number of users: "))
+DATA_LIMIT_GB = int(input("Enter data limit in GB: "))
+Days = int(input("Enter Days: "))
 
 def generate_username(base_name, number):
     return f"{base_name}{number}"
@@ -30,6 +32,8 @@ def get_access_token(username, password):
     except requests.exceptions.RequestException as e:
         logging.error(f'Error occurred while obtaining access token: {e}')
         return None
+
+logging.basicConfig(filename='script_log.log', level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def create_new_user(access_token, username, proxies, inbounds, expire, data_limit, data_limit_reset_strategy):
     url = f"{API_URL}/user"
@@ -55,27 +59,29 @@ def create_new_user(access_token, username, proxies, inbounds, expire, data_limi
         print(f"Error occurred while creating user {username}: {e}")
         return None
 
-logging.basicConfig(filename='script_log.log', level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
-
 def generate_users(base_name, start_number, num_users, data_limit):
-    data_limit_bytes = data_limit * 1024**3  # Convert data limit from GB to bytes
+    data_limit_bytes = data_limit * 1024**3
 
-    access_token = get_access_token(Username, Password)  # Replace with your actual username and password
+    access_token = get_access_token(Username, Password)
 
     if access_token:
+        proxies = {}
+        vmess_input = input(f"Do users have Vmess ۰? (y/n): ")
+        if vmess_input.lower() == 'y':
+            proxies['vmess'] = {}
+
+        vless_input = input(f"Do users have Vless ? (y/n): ")
+        if vless_input.lower() == 'y':
+            proxies['vless'] = {'flow': 'xtls-rprx-vision'}
+
+        trojan_input = input(f"Do users have Trojan ? (y/n): ")
+        if trojan_input.lower() == 'y':
+            proxies['trojan'] = {}
+
         for i in range(start_number, start_number + num_users):
             username = generate_username(base_name, i)
-            proxies = {
-                'vmess': {},
-                'vless': {
-                    'flow': 'xtls-rprx-vision'
-                    }
-            }
-            inbounds = {
-                'vmess': ['VMESS_TCP_INBOUND'],
-                'vless': ['VLESS_TCP_Reality_INBOUND', 'VLESS_TCP_INBOUND']
-            }
-            expire = int(datetime.datetime.now().timestamp()) + (24 * 3600 * (Days+1))  # Expiring in 7 days
+            inbounds = {}
+            expire = int(datetime.datetime.now().timestamp()) + (24 * 3600 * (Days + 1))
 
             user = create_new_user(access_token, username, proxies, inbounds, expire, data_limit_bytes, 'no_reset')
             if user:
@@ -83,5 +89,4 @@ def generate_users(base_name, start_number, num_users, data_limit):
     else:
         print("Failed to obtain the access token.")
 
-# Generate new users
 generate_users(BASE_NAME, START_NUMBER, NUM_USERS, DATA_LIMIT_GB)
