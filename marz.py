@@ -80,7 +80,7 @@ if __name__ == "__main__":
             NUM_USERS = int(input("Enter number of users: "))
             DATA_LIMIT_GB = int(input("Enter data limit in GB: "))
             Days = int(input("Enter Days: "))
-
+            note = input("Enter note for the users: ")
             data_limit_bytes = DATA_LIMIT_GB * 1024**3
 
             proxies = {}
@@ -104,12 +104,12 @@ if __name__ == "__main__":
 
                 if user_type == 'normal':
                     status = None
-                    note = input("Enter note for the users: ")
+                    
                     on_hold_expire_duration = None
                     expire = int(datetime.datetime.now().timestamp()) + (24 * 3600 * (Days + 1))
                 elif user_type == 'on hold':
                     status = 'on_hold'
-                    note = input("Enter note for the users: ")
+                    
                     on_hold_expire_duration = int(datetime.datetime.now().timestamp()) + (24 * 3600 * (Days + 1))
                     expire = None
                 else:
