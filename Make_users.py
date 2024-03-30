@@ -2,19 +2,18 @@ import requests
 import datetime
 import logging
 
-
-Username = "user"
-Password = "pass"
-Api_url = 'https://domain.com:1234/api'  # Replace with the actual API URL
-Base_name = 'user'  # Base name for the new users
-Start_number = 22  # Start number for the new users
-Num_users = 10  # Number of new users to create
-Data_limit_GB = 15  # Data limit per GB
-Days = 12 # Expire Date per Day (enter 0 for unlimite)
-flow = 'xtls-rprx-vision'
-status = 'active' # replace with on_hold for count after first connection
-data_limit_reset_strategy = 'no_reset'
-
+# Constants
+USERNAME = "user"
+PASSWORD = "pass"
+API_URL = 'https://sub.domain.com:port'  # Replace with the panel URL
+BASE_NAME = 'user'  # Base name for the new users
+START_NUMBER = 22  # Start number for the new users
+NUM_USERS = 10  # Number of new users to create
+DATA_LIMIT_GB = 15  # Data limit per GB
+DAYS = 12  # Expire Date per Day (enter 0 for unlimited)
+FLOW = 'xtls-rprx-vision'
+STATUS = 'active'  # replace with 'on_hold' for count after first connection
+DATA_LIMIT_RESET_STRATEGY = 'no_reset'
 proxies = {
     'vmess': {},
     'vless': {
@@ -24,27 +23,34 @@ proxies = {
 inbounds = {
     'vmess': ['VMESS_TCP_INBOUND'],
     'vless': ['VLESS_TCP_Reality_INBOUND', 'VLESS_TCP_INBOUND']
-}
+} # If you want all inbounds, leave it blank
 
-def generate_username(base_name, number):
-    return f"{base_name}{number}"
+# Now just run code...
+logging.basicConfig(level=logging.INFO, format='%(asctime)s\t|\t%(levelname)-8s\t-> %(message)s' , datefmt='%H:%M:%S')
 
-def get_access_token(username, password):
-    url = f"{Api_url}/admin/token"
+# Function to obtain access headers
+def get_access_headers(username, password):
+    url = f"{Api_url}/api/admin/token"
     data = {
         'username': username,
         'password': password
     }
-
     try:
         response = requests.post(url, data=data)
         response.raise_for_status()
         access_token = response.json()['access_token']
-        return access_token
+        access_headers = {
+            'accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': f"Bearer {access_token}"
+        }
+        logging.info('✅\tAuthorization header was created successfully')
+        return access_headers
     except requests.exceptions.RequestException as e:
-        logging.error(f'Error occurred while obtaining access token: {e}')
+        logging.error(f'❌\tError occurred while obtaining access headers: {e}')
         return None
 
+# Function to create payload for new users
 def create_user_payload(username, proxies, inbounds, expire, data_limit):
     if status == 'active':
         payload = {
@@ -67,57 +73,35 @@ def create_user_payload(username, proxies, inbounds, expire, data_limit):
             'data_limit_reset_strategy': data_limit_reset_strategy
         }
     else:
-        print("wrong status.")
-
+        payload = False
     return payload
 
-def create_new_user(access_token, username, payload):
-    url = f"{Api_url}/user"
-    headers = {
-        'accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': f"Bearer {access_token}"
-    }
-
+# Function to create new user
+def create_new_user(access_headers, username, payload):
+    url = f"{Api_url}/api/user"
     try:
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=access_headers)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"Error occurred while creating user {username}: {e}")
-        return None
+        logging.error(f'❌\tError occurred while creating user {username}: {e}')
+        return False
 
-logging.basicConfig(filename='script_log.log', level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
-
-
+# Function to generate users
 def generate_users(base_name, start_number, Num_users, data_limit):
     data_limit_bytes = data_limit * 1024 ** 3
-
-    access_token = get_access_token(Username, Password)
-
-    if access_token:
-
+    access_headers = get_access_headers(Username, Password)
+    if access_headers:
         for i in range(start_number, start_number + Num_users):
-            username = generate_username(base_name, i)
-            
-            if status == 'active':
-                if Days == 0:
-                    expire = None
-                else:
-                    expire = int(datetime.datetime.now().timestamp()) + \
-                        (24 * 3600 * (Days + 1))
-            else:
-                expire = (24 * 3600 * Days)
-            
+            username = f'{base_name}{i}'
+            expire = None if Days == 0 else int(datetime.datetime.now().timestamp()) + (24 * 3600 * (Days + 1)) if status == 'active' else (24 * 3600 * Days)
             payload = create_user_payload(username, proxies, inbounds, expire, data_limit_bytes)
             if payload :
-                user = create_new_user(access_token, username, payload)
-            if user:
-                subscription_url = user.get('subscription_url', '')
-                if subscription_url:
-                    print(f"{username} sub link: {subscription_url}")
-    else:
-        print("Failed to obtain the access token.")
+                user = create_new_user(access_headers, username, payload)
+                if user:
+                    logging.info(f"✅\tUser '{username}' is created , user sub_link :\n\t{user.get('subscription_url', '')}")
+            else :
+                logging.error(f'❌ Wrong status.')
 
 # Generate new users
 generate_users(Base_name, Start_number, Num_users, Data_limit_GB)
